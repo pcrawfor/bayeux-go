@@ -373,7 +373,7 @@ func (f *Client) writeMessage(message server.BayeuxResponse) error {
 			return cerr
 		}
 		if !f.conn.Connected() {
-			errors.New("Not Connected, Reconnect Failed.")
+			return errors.New("Not Connected, Reconnect Failed.")
 		}
 
 	}
