@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/pcrawfor/fayego/server"
-	"github.com/pcrawfor/fayego/shared"
+	"github.com/pcrawfor/bayeux-go/server"
+	"github.com/pcrawfor/bayeux-go/shared"
 )
 
 const defaultHost = "localhost:4001/bayeux"
@@ -304,10 +304,6 @@ type BayeuxResponse struct {
 }
 */
 
-// Bayeux message functions
-
-/*
- */
 func (f *Client) handshake() {
 	message := server.BayeuxResponse{Channel: shared.ChannelHandshake, Version: "1.0", SupportedConnectionTypes: []string{"websocket"}}
 	err := f.writeMessage(message)

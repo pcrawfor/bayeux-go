@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/pcrawfor/fayego/shared"
+	"github.com/pcrawfor/bayeux-go/shared"
 )
 
 // Server is the main Bayeux server object which manages connections, subscriptions and clients

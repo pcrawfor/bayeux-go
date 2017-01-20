@@ -51,61 +51,7 @@ func (c *Connection) esWrite(payload []byte) error {
 	return nil
 }
 
-/*
-from faye js:
-
-handle: function(request, response) {
-    var requestUrl    = url.parse(request.url, true),
-        requestMethod = request.method,
-        origin        = request.headers.origin,
-        self          = this;
-
-    request.originalUrl = request.url;
-
-    request.on('error', function(error) { self._returnError(response, error) });
-    response.on('error', function(error) { self._returnError(null, error) });
-
-    if (this._static.test(requestUrl.pathname))
-      return this._static.call(request, response);
-
-    // http://groups.google.com/group/faye-users/browse_thread/thread/4a01bb7d25d3636a
-    if (requestMethod === 'OPTIONS' || request.headers['access-control-request-method'] === 'POST')
-      return this._handleOptions(response);
-
-    if (Faye.EventSource.isEventSource(request))
-      return this.handleEventSource(request, response);
-
-    if (requestMethod === 'GET')
-      return this._callWithParams(request, response, requestUrl.query);
-
-    if (requestMethod === 'POST')
-      return Faye.withDataFor(request, function(data) {
-        var type   = (request.headers['content-type'] || '').split(';')[0],
-            params = (type === 'application/json')
-                   ? {message: data}
-                   : querystring.parse(data);
-
-        request.body = data;
-        self._callWithParams(request, response, params);
-      });
-
-    this._returnError(response, {message: 'Unrecognized request type'});
-  },
-
-
- _handleOptions: function(response) {
-    var headers = {
-      'Access-Control-Allow-Credentials': 'false',
-      'Access-Control-Allow-Headers':     'Accept, Content-Type, Pragma, X-Requested-With',
-      'Access-Control-Allow-Methods':     'POST, GET, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Origin':      '*',
-      'Access-Control-Max-Age':           '86400'
-    };
-    response.writeHead(200, headers);
-    response.end('');
-  },
-*/
-
+// serverOther handle non WS requests
 func serveOther(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("serve other: ", r.URL)
 
@@ -136,25 +82,7 @@ func handleEventSource(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-/*
-handleEventSource: function(request, response) {
-    var es       = new Faye.EventSource(request, response, {ping: this._options.ping}),
-        clientId = es.url.split('/').pop(),
-        self     = this;
-
-    this.debug('Opened EventSource connection for ?', clientId);
-    this._server.openSocket(clientId, es, request);
-
-    es.onclose = function(event) {
-      self._server.closeSocket(clientId);
-      es = null;
-    };
-  },
-*/
-
-/*
-serverWs - provides an http handler for upgrading a connection to a websocket connection
-*/
+// serverWs - provides an http handler for upgrading a connection to a websocket connection
 func serveWs(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("serveWs")
 	fmt.Println("METHOD: ", r.Method)
@@ -200,9 +128,7 @@ func serveWs(w http.ResponseWriter, r *http.Request) {
 	c.reader(f)
 }
 
-/*
-handleOptions allows for access control awesomeness
-*/
+// handleOptions allows for access control awesomeness
 func handleOptions(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Handle options!")
 	w.Header().Set("Access-Control-Allow-Credentials", "false")
@@ -214,14 +140,7 @@ func handleOptions(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-// EventSource.isEventSource = function(request) {
-//   if (request.method !== 'GET') return false;
-//   var accept = (request.headers.accept || '').split(/\s*,\s*/);
-//   return accept.indexOf('text/event-stream') >= 0;
-// };
-/*
-isEventSource
-*/
+// isEventSource
 func isEventSource(r *http.Request) bool {
 	fmt.Println("isEventSource? ", r.Method)
 	if r.Method != "GET" {
@@ -240,9 +159,6 @@ func Start(addr string) {
 	f = NewServer()
 	http.HandleFunc("/bayeux", serveWs)
 	http.HandleFunc("/", serveOther)
-
-	// serve static assets workaround
-	//http.Handle("/file/", http.StripPrefix("/file", http.FileServer(http.Dir("/Users/paul/go/src/github.com/pcrawfor/fayego/runner"))))
 
 	err := http.ListenAndServe(addr, nil)
 	if err != nil {
