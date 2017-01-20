@@ -5,7 +5,7 @@ import (
 	"net/http"
 )
 
-func serveJSONP(f *Server, w http.ResponseWriter, r *http.Request) {
+func serveJSONP(s *Server, w http.ResponseWriter, r *http.Request) {
 	jsonpParam := r.FormValue("jsonp")
 
 	if len(jsonpParam) > 0 {
@@ -17,7 +17,7 @@ func serveJSONP(f *Server, w http.ResponseWriter, r *http.Request) {
 		messageStr := fmt.Sprint(message)
 
 		// handle the faye message
-		response, err := f.HandleMessage([]byte(messageStr), nil)
+		response, err := s.HandleMessage([]byte(messageStr), nil)
 		if err != nil {
 			fmt.Println("Error parsing message: ", err)
 		}

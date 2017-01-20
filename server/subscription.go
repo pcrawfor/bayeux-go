@@ -24,7 +24,7 @@ func (c *Client) isSubscribed(sub string) bool {
 }
 
 // subscriptionClientIndex finds the index for the given clientID in the subscriptions or returns -1 if not found
-func (f *Server) subscriptionClientIndex(subscriptions []Client, clientID string) int {
+func (s *Server) subscriptionClientIndex(subscriptions []Client, clientID string) int {
 	for i, c := range subscriptions {
 		if c.ClientID == clientID {
 			return i
@@ -34,7 +34,7 @@ func (f *Server) subscriptionClientIndex(subscriptions []Client, clientID string
 }
 
 // removeSubFromClient removes a Subscription from a given client
-func (f *Server) removeSubFromClient(client Client, sub string) Client {
+func (s *Server) removeSubFromClient(client Client, sub string) Client {
 	for i, clientSub := range client.ClientSubs {
 		if clientSub == sub {
 			client.ClientSubs = append(client.ClientSubs[:i], client.ClientSubs[i+1:]...)
@@ -45,54 +45,54 @@ func (f *Server) removeSubFromClient(client Client, sub string) Client {
 }
 
 // removeClientFromSubscription removes the given clientID from the subscription
-func (f *Server) removeClientFromSubscription(clientID, subscription string) bool {
+func (s *Server) removeClientFromSubscription(clientID, subscription string) bool {
 	fmt.Println("Remove Client From Subscription: ", subscription)
 
 	// grab the client subscriptions array for the channel
-	f.SubMutex.Lock()
-	defer f.SubMutex.Unlock()
+	s.SubMutex.Lock()
+	defer s.SubMutex.Unlock()
 
-	subs, ok := f.Subscriptions[subscription]
+	subs, ok := s.Subscriptions[subscription]
 
 	if !ok {
 		return false
 	}
 
-	index := f.subscriptionClientIndex(subs, clientID)
+	index := s.subscriptionClientIndex(subs, clientID)
 
 	if index >= 0 {
-		f.Subscriptions[subscription] = append(subs[:index], subs[index+1:]...)
+		s.Subscriptions[subscription] = append(subs[:index], subs[index+1:]...)
 	} else {
 		return false
 	}
 
 	// remove sub from client subs list
-	f.Clients[clientID] = f.removeSubFromClient(f.Clients[clientID], subscription)
+	s.Clients[clientID] = s.removeSubFromClient(s.Clients[clientID], subscription)
 
 	return true
 }
 
 // addClientFromSubscription adds the given clientID to the subscription
-func (f *Server) addClientToSubscription(clientID, subscription string, c chan []byte) bool {
+func (s *Server) addClientToSubscription(clientID, subscription string, c chan []byte) bool {
 	fmt.Println("Add Client to Subscription: ", subscription)
 
 	// Add client to server list if it is not present
-	client := f.addClientToServer(clientID, subscription, c)
+	client := s.addClientToServer(clientID, subscription, c)
 
 	// add the client as a subscriber to the channel if it is not already one
-	f.SubMutex.Lock()
-	defer f.SubMutex.Unlock()
-	subs, cok := f.Subscriptions[subscription]
+	s.SubMutex.Lock()
+	defer s.SubMutex.Unlock()
+	subs, cok := s.Subscriptions[subscription]
 	if !cok {
-		f.Subscriptions[subscription] = []Client{}
+		s.Subscriptions[subscription] = []Client{}
 	}
 
-	index := f.subscriptionClientIndex(subs, clientID)
+	index := s.subscriptionClientIndex(subs, clientID)
 
-	fmt.Println("Subs: ", f.Subscriptions, "count: ", len(f.Subscriptions[subscription]))
+	fmt.Println("Subs: ", s.Subscriptions, "count: ", len(s.Subscriptions[subscription]))
 
 	if index < 0 {
-		f.Subscriptions[subscription] = append(subs, *client)
+		s.Subscriptions[subscription] = append(subs, *client)
 		return true
 	}
 
@@ -102,33 +102,33 @@ func (f *Server) addClientToSubscription(clientID, subscription string, c chan [
 // client management
 
 // UpdateClientChannel updates the write channel for the given clientID with the provided channel
-func (f *Server) UpdateClientChannel(clientID string, c chan []byte) bool {
+func (s *Server) UpdateClientChannel(clientID string, c chan []byte) bool {
 	fmt.Println("update client for channel: clientID: ", clientID)
-	f.ClientMutex.Lock()
-	defer f.ClientMutex.Unlock()
-	client, ok := f.Clients[clientID]
+	s.ClientMutex.Lock()
+	defer s.ClientMutex.Unlock()
+	client, ok := s.Clients[clientID]
 	if !ok {
 		client = Client{clientID, c, []string{}}
-		f.Clients[clientID] = client
+		s.Clients[clientID] = client
 		return true
 	}
 
 	client.WriteChannel = c
-	f.Clients[clientID] = client
+	s.Clients[clientID] = client
 
 	return true
 }
 
 // addClientToServer Add Client to server only if the client is not already present
-func (f *Server) addClientToServer(clientID, subscription string, c chan []byte) *Client {
+func (s *Server) addClientToServer(clientID, subscription string, c chan []byte) *Client {
 	fmt.Println("Add client: ", clientID)
 
-	f.ClientMutex.Lock()
-	defer f.ClientMutex.Unlock()
-	client, ok := f.Clients[clientID]
+	s.ClientMutex.Lock()
+	defer s.ClientMutex.Unlock()
+	client, ok := s.Clients[clientID]
 	if !ok {
 		client = Client{clientID, c, []string{}}
-		f.Clients[clientID] = client
+		s.Clients[clientID] = client
 	}
 
 	fmt.Println("Client subs: ", len(client.ClientSubs), " | ", client.ClientSubs)
@@ -137,7 +137,7 @@ func (f *Server) addClientToServer(clientID, subscription string, c chan []byte)
 	if !client.isSubscribed(subscription) {
 		fmt.Println("Client not subscribed")
 		client.ClientSubs = append(client.ClientSubs, subscription)
-		f.Clients[clientID] = client
+		s.Clients[clientID] = client
 		fmt.Println("Client sub count: ", len(client.ClientSubs))
 	} else {
 		fmt.Println("Client already subscribed")
@@ -147,13 +147,13 @@ func (f *Server) addClientToServer(clientID, subscription string, c chan []byte)
 }
 
 // removeClientFromServer temoves the Client from the server and unsubscribe from any subscriptions
-func (f *Server) removeClientFromServer(clientID string) error {
+func (s *Server) removeClientFromServer(clientID string) error {
 	fmt.Println("Remove client: ", clientID)
 
-	f.ClientMutex.Lock()
-	defer f.ClientMutex.Unlock()
+	s.ClientMutex.Lock()
+	defer s.ClientMutex.Unlock()
 
-	client, ok := f.Clients[clientID]
+	client, ok := s.Clients[clientID]
 	if !ok {
 		return errors.New("Error removing client")
 	}
@@ -161,7 +161,7 @@ func (f *Server) removeClientFromServer(clientID string) error {
 	// clear any subscriptions
 	for _, sub := range client.ClientSubs {
 		fmt.Println("Remove sub: ", sub)
-		if f.removeClientFromSubscription(client.ClientID, sub) {
+		if s.removeClientFromSubscription(client.ClientID, sub) {
 			fmt.Println("Removed sub!")
 		} else {
 			fmt.Println("Failed to remove sub.")
@@ -169,7 +169,7 @@ func (f *Server) removeClientFromServer(clientID string) error {
 	}
 
 	// remove the client from the server
-	delete(f.Clients, clientID)
+	delete(s.Clients, clientID)
 
 	return nil
 }

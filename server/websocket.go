@@ -25,14 +25,12 @@ const (
 	maxMessageSize = 1024
 )
 
-/*
-reader - reads messages from the websocket connection and passes them through to the server message handler
-*/
-func (c *Connection) reader(f *Server) {
+// reader - reads messages from the websocket connection and passes them through to the server message handler
+func (c *Connection) reader(s *Server) {
 	fmt.Println("reading...")
 	defer func() {
 		fmt.Println("reader disconnect")
-		f.DisconnectChannel(c.send)
+		s.DisconnectChannel(c.send)
 		c.ws.Close()
 	}()
 	c.ws.SetReadLimit(maxMessageSize)
@@ -49,7 +47,7 @@ func (c *Connection) reader(f *Server) {
 		}
 
 		// ask faye server to handle faye message
-		response, ferr := f.HandleMessage(message, c.send)
+		response, ferr := s.HandleMessage(message, c.send)
 		if ferr != nil {
 			fmt.Println("Faye Error: ", ferr)
 			c.send <- []byte(fmt.Sprint("Error: ", ferr))
@@ -62,18 +60,14 @@ func (c *Connection) reader(f *Server) {
 	fmt.Println("reader exited.")
 }
 
-/*
-write - writes messages to the websocket connection
-*/
+// write - writes messages to the websocket connection
 func (c *Connection) wsWrite(mt int, payload []byte) error {
 	c.ws.SetWriteDeadline(time.Now().Add(writeWait))
 	return c.ws.WriteMessage(mt, payload)
 }
 
-/*
-writer - is the write loop that reads messages off the send channel and writes them out over the websocket connection
-*/
-func (c *Connection) writer(f *Server) {
+// writer - is the write loop that reads messages off the send channel and writes them out over the websocket connection
+func (c *Connection) writer(s *Server) {
 	fmt.Println("Writer started.")
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {

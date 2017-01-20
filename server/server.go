@@ -30,16 +30,16 @@ func NewServer() *Server {
 }
 
 // publishToChannel publishes the message data string to the given channel
-func (f *Server) publishToChannel(channel, data string) {
-	subs, ok := f.Subscriptions[channel]
-	fmt.Println("Subs: ", f.Subscriptions, "count: ", len(f.Subscriptions[channel]))
+func (s *Server) publishToChannel(channel, data string) {
+	subs, ok := s.Subscriptions[channel]
+	fmt.Println("Subs: ", s.Subscriptions, "count: ", len(s.Subscriptions[channel]))
 	if ok {
-		f.multiplexWrite(subs, data)
+		s.multiplexWrite(subs, data)
 	}
 }
 
 // multiplexWrite sends data to the subscriptions provided
-func (f *Server) multiplexWrite(subs []Client, data string) {
+func (s *Server) multiplexWrite(subs []Client, data string) {
 	var group sync.WaitGroup
 	for i := range subs {
 		fmt.Println("subs[i]: ", subs[i])
@@ -58,11 +58,11 @@ func (f *Server) multiplexWrite(subs []Client, data string) {
 }
 
 // findClientForChannel looks up the client associated with a given write channel
-func (f *Server) findClientForChannel(c chan []byte) *Client {
-	f.ClientMutex.Lock()
-	defer f.ClientMutex.Unlock()
+func (s *Server) findClientForChannel(c chan []byte) *Client {
+	s.ClientMutex.Lock()
+	defer s.ClientMutex.Unlock()
 
-	for _, client := range f.Clients {
+	for _, client := range s.Clients {
 		if client.WriteChannel == c {
 			fmt.Println("Matched Client: ", client.ClientID)
 			return &client
@@ -72,11 +72,11 @@ func (f *Server) findClientForChannel(c chan []byte) *Client {
 }
 
 // DisconnectChannel disconnects from the given channel sending the bayeux disconnect message
-func (f *Server) DisconnectChannel(c chan []byte) {
-	client := f.findClientForChannel(c)
+func (s *Server) DisconnectChannel(c chan []byte) {
+	client := s.findClientForChannel(c)
 	if client != nil {
 		fmt.Println("Disconnect Client: ", client.ClientID)
-		f.removeClientFromServer(client.ClientID)
+		s.removeClientFromServer(client.ClientID)
 	}
 }
 
@@ -91,7 +91,7 @@ type BayeuxMessage struct {
 }
 
 // HandleMessage is the core Bayeux message handler for the server, it interprets each bayeux message and triggers the appropriate response
-func (f *Server) HandleMessage(message []byte, c chan []byte) ([]byte, error) {
+func (s *Server) HandleMessage(message []byte, c chan []byte) ([]byte, error) {
 	fmt.Println("Raw message:", string(message))
 
 	// parse message JSON
@@ -118,23 +118,23 @@ func (f *Server) HandleMessage(message []byte, c chan []byte) ([]byte, error) {
 	switch fm.Channel {
 	case shared.ChannelHandshake:
 		fmt.Println("handshake")
-		return f.handshake()
+		return s.handshake()
 	case shared.ChannelConnect:
 		fmt.Println("connect")
-		return f.connect(fm.ClientID)
+		return s.connect(fm.ClientID)
 	case shared.ChannelDisconnect:
 		fmt.Println("disconnect")
-		return f.disconnect(fm.ClientID)
+		return s.disconnect(fm.ClientID)
 	case shared.ChannelSubscribe:
 		fmt.Println("subscribe")
-		return f.subscribe(fm.ClientID, fm.Subscription, c)
+		return s.subscribe(fm.ClientID, fm.Subscription, c)
 	case shared.ChannelUnsubscribe:
 		fmt.Println("subscribe")
-		return f.unsubscribe(fm.ClientID, fm.Subscription)
+		return s.unsubscribe(fm.ClientID, fm.Subscription)
 	default:
 		fmt.Println("publish")
 		fmt.Println("data is: ", fm.Data)
-		return f.publish(fm.Channel, fm.ID, fm.Data)
+		return s.publish(fm.Channel, fm.ID, fm.Data)
 	}
 }
 
@@ -183,7 +183,7 @@ Bayeux Handshake response
 
 */
 
-func (f *Server) handshake() ([]byte, error) {
+func (s *Server) handshake() ([]byte, error) {
 	fmt.Println("handshake!")
 
 	// build response
@@ -193,7 +193,7 @@ func (f *Server) handshake() ([]byte, error) {
 		Successful:               true,
 		Version:                  "1.0",
 		SupportedConnectionTypes: []string{"websocket", "eventsource"},
-		ClientID:                 f.core.GenerateClientID(),
+		ClientID:                 s.core.GenerateClientID(),
 		Advice:                   map[string]interface{}{"reconnect": "retry", "interval": 0, "timeout": 45000},
 	}
 
@@ -218,7 +218,7 @@ Example response
 ]
 */
 
-func (f *Server) connect(clientID string) ([]byte, error) {
+func (s *Server) connect(clientID string) ([]byte, error) {
 	// TODO: setup client connection state
 
 	resp := BayeuxResponse{
@@ -246,9 +246,9 @@ Example response
 ]
 */
 
-func (f *Server) disconnect(clientID string) ([]byte, error) {
+func (s *Server) disconnect(clientID string) ([]byte, error) {
 	// tear down client connection state
-	f.removeClientFromServer(clientID)
+	s.removeClientFromServer(clientID)
 
 	resp := BayeuxResponse{
 		Channel:    "/meta/disconnect",
@@ -275,14 +275,14 @@ Example response
 ]
 */
 
-func (f *Server) subscribe(clientID, subscription string, c chan []byte) ([]byte, error) {
+func (s *Server) subscribe(clientID, subscription string, c chan []byte) ([]byte, error) {
 
 	// subscribe the client to the given channel
 	if len(subscription) == 0 {
 		return []byte{}, errors.New("Subscription channel not present")
 	}
 
-	f.addClientToSubscription(clientID, subscription, c)
+	s.addClientToSubscription(clientID, subscription, c)
 
 	// if successful send success response
 	resp := BayeuxResponse{
@@ -314,14 +314,14 @@ Example response
 ]
 */
 
-func (f *Server) unsubscribe(clientID, subscription string) ([]byte, error) {
+func (s *Server) unsubscribe(clientID, subscription string) ([]byte, error) {
 	// TODO: unsubscribe the client from the given channel
 	if len(subscription) == 0 {
 		return []byte{}, errors.New("Subscription channel not present")
 	}
 
 	// remove the client as a subscriber on the channel
-	if f.removeClientFromSubscription(clientID, subscription) {
+	if s.removeClientFromSubscription(clientID, subscription) {
 		fmt.Println("Successful unsubscribe")
 	} else {
 		fmt.Println("Failed to unsubscribe")
@@ -355,7 +355,7 @@ Example response
 ]
 
 */
-func (f *Server) publish(channel, id string, data interface{}) ([]byte, error) {
+func (s *Server) publish(channel, id string, data interface{}) ([]byte, error) {
 
 	//convert data back to json string
 	message := BayeuxResponse{
@@ -372,8 +372,8 @@ func (f *Server) publish(channel, id string, data interface{}) ([]byte, error) {
 	fmt.Println("publish to: ", channel)
 	fmt.Println("data: ", string(dataStr))
 
-	f.publishToChannel(channel, string(dataStr))
-	f.publishToWildcard(channel, string(dataStr))
+	s.publishToChannel(channel, string(dataStr))
+	s.publishToWildcard(channel, string(dataStr))
 
 	resp := BayeuxResponse{
 		Channel:    channel,
@@ -384,11 +384,11 @@ func (f *Server) publish(channel, id string, data interface{}) ([]byte, error) {
 	return json.Marshal([]BayeuxResponse{resp})
 }
 
-func (f *Server) publishToWildcard(channel, dataStr string) {
+func (s *Server) publishToWildcard(channel, dataStr string) {
 	parts := strings.Split(channel, "/")
 	parts = parts[:len(parts)-1]
 	parts = append(parts, "*")
 	wildcardChannel := strings.Join(parts, "/")
 	fmt.Println("WILDCARD: ", wildcardChannel)
-	f.publishToChannel(wildcardChannel, dataStr)
+	s.publishToChannel(wildcardChannel, dataStr)
 }
