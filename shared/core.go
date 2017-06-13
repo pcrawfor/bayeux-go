@@ -2,14 +2,24 @@ package shared
 
 import (
 	"strconv"
+	"strings"
 
 	"code.google.com/p/go-uuid/uuid"
 )
 
+// ChannelHandshake handshake channel path
 const ChannelHandshake = "/meta/handshake"
+
+// ChannelConnect connect channel path
 const ChannelConnect = "/meta/connect"
+
+// ChannelDisconnect disconnect channel path
 const ChannelDisconnect = "/meta/disconnect"
+
+// ChannelSubscribe subscribe channel path
 const ChannelSubscribe = "/meta/subscribe"
+
+// ChannelUnsubscribe unsubscribe channel path
 const ChannelUnsubscribe = "/meta/unsubscribe"
 
 // Core shared functions
@@ -25,5 +35,6 @@ func (c *Core) NextMessageID() string {
 
 // GenerateClientID generates a new UUID string
 func (c *Core) GenerateClientID() string {
-	return uuid.New()
+	rawID := uuid.New()
+	return strings.Replace(rawID, "-", "", -1)
 }
